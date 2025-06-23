@@ -39,7 +39,8 @@ clone_repo() {
     # Check if directory already exists
     if [ -d "$target_path" ]; then
         print_status $YELLOW "⚠️  Directory already exists: $target_path"
-        read -p "Do you want to remove it and re-clone? (y/N): " -n 1 -r
+        # Use /dev/tty to read from terminal directly, avoiding conflict with file reading
+        read -p "Do you want to remove it and re-clone? (y/N): " -n 1 -r < /dev/tty
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$target_path"
@@ -118,18 +119,35 @@ EOF
     print_status $GREEN "📋 Using configuration file: $CONFIG_FILE"
     echo
     
-    # Read and process configuration file
+    # Read and process configuration file line by line
     local line_number=0
     local success_count=0
     local error_count=0
     
-    while IFS='|' read -r repo_url target_path branch || [ -n "$repo_url" ]; do
+    # Use file descriptor 3 to avoid conflicts with interactive input
+    while IFS= read -r line <&3 || [ -n "$line" ]; do
         line_number=$((line_number + 1))
         
         # Skip empty lines and comments
-        if [[ -z "$repo_url" ]] || [[ "$repo_url" =~ ^[[:space:]]*# ]]; then
+        if [[ -z "$line" ]] || [[ "$line" =~ ^[[:space:]]*# ]]; then
             continue
         fi
+        
+        # Debug: show raw line content
+        echo "Debug Line $line_number: raw='$line'"
+        
+        # Check if line has the correct format
+        if [[ "$line" != *"|"*"|"* ]]; then
+            print_status $RED "❌ Line $line_number: Invalid format (should be: repo_url|target_path|branch)"
+            error_count=$((error_count + 1))
+            continue
+        fi
+        
+        # Parse using parameter expansion instead of cut
+        repo_url="${line%%|*}"                    # Everything before first |
+        remaining="${line#*|}"                    # Everything after first |
+        target_path="${remaining%%|*}"            # Everything before second |
+        branch="${remaining#*|}"                  # Everything after second |
         
         # Trim whitespace
         repo_url=$(echo "$repo_url" | xargs)
@@ -163,7 +181,7 @@ EOF
             error_count=$((error_count + 1))
         fi
         
-    done < "$CONFIG_FILE"
+    done 3< "$CONFIG_FILE"
     
     # Summary
     echo "================================"
