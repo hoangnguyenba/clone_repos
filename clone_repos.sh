@@ -64,7 +64,7 @@ clone_repo() {
 # Function to validate repository URL
 validate_repo_url() {
     local url=$1
-    if [[ $url =~ ^https://github\.com/[^/]+/[^/]+\.git$ ]] || [[ $url =~ ^git@github\.com:[^/]+/[^/]+\.git$ ]] || [[ $url =~ ^https://github\.com/[^/]+/[^/]+$ ]]; then
+    if [[ $url =~ ^https://github\.com/[^/]+/[^/]+\.git$ ]] || [[ $url =~ ^https://github\.com/[^/]+/[^/]+$ ]] || [[ $url =~ ^git@github\.com:[^/]+/[^/]+\.git$ ]]; then
         return 0
     else
         return 1
@@ -142,6 +142,7 @@ EOF
         # Validate required fields
         if [[ -z "$repo_url" ]] || [[ -z "$target_path" ]] || [[ -z "$branch" ]]; then
             print_status $RED "❌ Line $line_number: Missing required fields (repo_url|target_path|branch)"
+            print_status $RED "   Debug: repo_url='$repo_url' target_path='$target_path' branch='$branch'"
             error_count=$((error_count + 1))
             continue
         fi
@@ -150,6 +151,7 @@ EOF
         repo_url=$(normalize_github_url "$repo_url")
         if ! validate_repo_url "$repo_url"; then
             print_status $RED "❌ Line $line_number: Invalid GitHub repository URL: $repo_url"
+            print_status $RED "   Debug: Original line content for debugging"
             error_count=$((error_count + 1))
             continue
         fi
