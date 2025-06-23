@@ -23,6 +23,10 @@ print_status() {
     echo -e "${color}${message}${NC}"
 }
 
+# Global variables for batch operations
+SKIP_ALL_EXISTING=false
+RECLONE_ALL_EXISTING=false
+
 # Function to clone a single repository
 clone_repo() {
     local repo_url=$1
@@ -39,15 +43,38 @@ clone_repo() {
     # Check if directory already exists
     if [ -d "$target_path" ]; then
         print_status $YELLOW "⚠️  Directory already exists: $target_path"
-        # Use /dev/tty to read from terminal directly, avoiding conflict with file reading
-        read -p "Do you want to remove it and re-clone? (y/N): " -n 1 -r < /dev/tty
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            rm -rf "$target_path"
-            print_status $GREEN "✅ Removed existing directory"
-        else
-            print_status $YELLOW "⏭️  Skipping: $target_path"
+        
+        # Check global flags first
+        if [ "$SKIP_ALL_EXISTING" = true ]; then
+            print_status $YELLOW "⏭️  Skipping: $target_path (skip all mode)"
             return 0
+        elif [ "$RECLONE_ALL_EXISTING" = true ]; then
+            print_status $GREEN "🔄 Re-cloning: $target_path (reclone all mode)"
+            rm -rf "$target_path"
+        else
+            # Ask user for action
+            read -p "Do you want to (y)es re-clone, (n)o skip, (s)kip all remaining, (r)eclone all remaining? (y/n/s/r): " -n 1 -r < /dev/tty
+            echo
+            case $REPLY in
+                [Yy])
+                    rm -rf "$target_path"
+                    print_status $GREEN "✅ Removed existing directory"
+                    ;;
+                [Ss])
+                    SKIP_ALL_EXISTING=true
+                    print_status $YELLOW "⏭️  Skipping: $target_path (and all remaining)"
+                    return 0
+                    ;;
+                [Rr])
+                    RECLONE_ALL_EXISTING=true
+                    rm -rf "$target_path"
+                    print_status $GREEN "🔄 Re-cloning: $target_path (and all remaining)"
+                    ;;
+                *)
+                    print_status $YELLOW "⏭️  Skipping: $target_path"
+                    return 0
+                    ;;
+            esac
         fi
     fi
     
